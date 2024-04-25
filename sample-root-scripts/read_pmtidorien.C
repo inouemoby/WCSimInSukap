@@ -1,0 +1,62 @@
+#include "TFile.h"
+#include "TTree.h"
+#include "TH1F.h"
+#include "TCanvas.h"
+#include "TSystem.h"
+#include "TMath.h"
+#include "TLorentzVector.h"
+
+void read_pmtidorien(const char* filename = "../rootfile/wcsim_output.root")
+{
+  //define parameter
+  int startID = 1;
+  int endID = 20;
+    char* wcsimdirenv;
+    wcsimdirenv = getenv("WCSIMDIR");
+    if(wcsimdirenv !=  NULL){
+        gSystem->Load("${WCSIMDIR}/libWCSimRoot.so");
+    }else{
+        gSystem->Load("../libWCSimRoot.so");
+    }
+
+    TFile *file = TFile::Open(filename);
+    if (!file || file->IsZombie())
+    {
+        return;
+    }
+
+	TLorentzVector photonPosition(0, 0, 0, 0); 
+
+	WCSimRootGeom *geo = 0;
+	TTree *geotree = (TTree*)file->Get("wcsimGeoT");
+	geotree->SetBranchAddress("wcsimrootgeom", &geo);
+	geotree->GetEntry(0);
+
+	int numPMTs = geo->GetWCNumPMT();
+
+	//TH1F *angleHist = new TH1F("Angle", "PMT ID vs Angle", numPMTs, 0, numPMTs);
+	TH1F *angleHist = new TH1F("Angle", "PMT ID vs Angle", endID - startID, startID, endID );
+
+	angleHist->GetXaxis()->SetTitle("PMT ID");
+	angleHist->GetYaxis()->SetTitle("Angle [degree]");
+
+	for (int tubeID = 1; tubeID <= numPMTs; ++tubeID)
+	{
+        WCSimRootPMT pmtInfo = geo->GetPMT(tubeID - 1);
+
+        TLorentzVector pmtPosition(pmtInfo.GetPosition(0), pmtInfo.GetPosition(1), pmtInfo.GetPosition(2), 0);
+        TLorentzVector pmtOrientation(pmtInfo.GetOrientation(0), pmtInfo.GetOrientation(1), pmtInfo.GetOrientation(2), 0);
+
+        TLorentzVector positionVector = pmtPosition - photonPosition;
+
+        double cosTheta = positionVector.Dot(pmtOrientation) / (positionVector.Vect().Mag() * pmtOrientation.Vect().Mag());
+
+        double angle = TMath::ACos(cosTheta) * TMath::RadToDeg();
+
+        angleHist->Fill(tubeID, angle);
+	}
+
+	TCanvas *c2 = new TCanvas("c2", "PMT ID vs Angle", 800, 600);
+	angleHist->Draw();
+	c2->Update();
+}

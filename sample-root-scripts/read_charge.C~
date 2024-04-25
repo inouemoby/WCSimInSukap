@@ -1,0 +1,42 @@
+void read_charge() {
+    char* wcsimdirenv;
+    wcsimdirenv = getenv ("WCSIMDIR");
+    if(wcsimdirenv !=  NULL){
+        gSystem->Load(Form("%s/libWCSimRoot.so", wcsimdirenv));
+    }else{
+        gSystem->Load("../libWCSimRoot.so");
+    }
+    // Open the WCSim output file
+    TFile *file = new TFile("../rootfile/wcsim_output.root", "READ");
+    // Get the WCSim tree
+    TCanvas *c1 = new TCanvas("c1", "PMT Timing vs Number of Photoelectrons", 800, 600);
+    TTree *tree = (TTree*)file->Get("wcsimT");
+    // Create a histogram to store the charge per event
+    TH1F *hist = new TH1F("hist", "Charge per Event", 100, 0, 100);
+    // Get the number of entries in the tree
+    int nentries = tree->GetEntries();
+    // Get the WCSimRootEvent object
+    WCSimRootEvent *event = 0;
+    tree->SetBranchAddress("wcsimrootevent", &event);
+    // Loop over the entries in the tree
+    for (int i = 0; i < nentries; i++) {
+        tree->GetEntry(i);
+        // Get the WCSimRootTrigger object for this event
+        WCSimRootTrigger *trigger = event->GetTrigger(0);
+        // Get the number of Cherenkov hits for this event
+        int nhits = trigger->GetNcherenkovdigihits();
+        double total_charge = 0;
+        // Loop over the Cherenkov hits
+        for (int j = 0; j < nhits; j++) {
+            // Get the WCSimRootCherenkovHit object for this hit
+            WCSimRootCherenkovDigiHit *hit = (WCSimRootCherenkovDigiHit*)trigger->GetCherenkovDigiHits()->At(j);
+            // Get the charge for this hit
+            double charge = trigger->GetSumQ();
+            total_charge += charge;
+        }
+        // Fill the histogram with the total charge for this event
+        hist->Fill(total_charge);
+    }
+    // Draw the histogram
+    hist->Draw();
+}

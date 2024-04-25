@@ -1,0 +1,45 @@
+void read_pmt_timingpe() {
+    char* wcsimdirenv;
+    wcsimdirenv = getenv ("WCSIMDIR");
+    if(wcsimdirenv !=  NULL){
+        gSystem->Load(Form("%s/libWCSimRoot.so", wcsimdirenv));
+    }else{
+        gSystem->Load("../libWCSimRoot.so");
+    }
+    // Open the WCSim output file
+    TFile *file = new TFile("../rootfile/wcsim_output.root", "READ");
+    TCanvas *c1 = new TCanvas("c1", "PMT Timing vs Number of Photoelectrons", 800, 600);
+    // Get the WCSim tree
+    TTree *tree = (TTree*)file->Get("wcsimT");
+    // Create a 2D histogram to store the PMT timing vs number of photoelectrons
+    TH2F *hist = new TH2F("hist", "PMT Timing vs Number of Photoelectrons", 100, 0, 100, 100, 0, 2000);
+    // Set the x-axis to log scale
+    gPad->SetLogx();
+    // Get the number of entries in the tree
+    int nentries = tree->GetEntries();
+    // Get the WCSimRootEvent object
+    WCSimRootEvent *event = 0;
+    tree->SetBranchAddress("wcsimrootevent", &event);
+    // Loop over the entries in the tree
+    for (int i = 0; i < nentries; i++) {
+        tree->GetEntry(i);
+        // Get the WCSimRootTrigger object for this event
+        WCSimRootTrigger *trigger = event->GetTrigger(0);
+        // Get the number of Cherenkov hits for this event
+        int nhits = trigger->GetNcherenkovhits();
+        // Loop over the Cherenkov hits
+        for (int j = 0; j < nhits; j++) {
+            // Get the WCSimRootCherenkovHit and Hittime object for this hit
+	  WCSimRootCherenkovHit *hit = (WCSimRootCherenkovHit*)trigger->GetCherenkovHits()->At(j);
+	  WCSimRootCherenkovHitTime *hittime = (WCSimRootCherenkovHitTime*)trigger->GetCherenkovHitTimes()->At(j);
+            // Get the PMT timing for this hit
+	    double time = hittime->GetTruetime();
+            // Get the number of photoelectrons for this hit
+            double pe = hit->GetTotalPe(0);
+            // Fill the histogram with the PMT timing and number of photoelectrons
+            hist->Fill(pe, time);
+        }
+    }
+    // Draw the histogram
+    hist->Draw("");
+}

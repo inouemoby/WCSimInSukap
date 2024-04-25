@@ -1,0 +1,135 @@
+#include "TFile.h"
+#include "TTree.h"
+#include "TH1F.h"
+#include "TCanvas.h"
+#include "TSystem.h"
+#include "TMath.h"
+#include "TLorentzVector.h"
+#include "TMultiGraph.h"
+#include "TGraph.h"
+
+void read_pmtidplot(const char* filename = "../rootfile/wcsim_output.root")
+{
+  // parameter define here
+  int startID = 1;
+  int endID = 39;
+
+  
+    char* wcsimdirenv;
+    wcsimdirenv = getenv("WCSIMDIR");
+    if(wcsimdirenv !=  NULL){
+        gSystem->Load("${WCSIMDIR}/libWCSimRoot.so");
+    }else{
+        gSystem->Load("../libWCSimRoot.so");
+    }
+
+    TFile *file = TFile::Open(filename);
+    if (!file || file->IsZombie())
+    {
+        return;
+    }
+
+    TTree *tree = (TTree*)file->Get("wcsimT");
+    if (!tree)
+    {
+      file->Close();
+      return;
+    }
+	TLorentzVector photonPosition(0, 0, 0, 0); 
+
+	WCSimRootEvent *wcsimrootsuperevent = new WCSimRootEvent();
+	tree->SetBranchAddress("wcsimrootevent", &wcsimrootsuperevent);
+	
+	WCSimRootGeom *geo = 0;
+	TTree *geotree = (TTree*)file->Get("wcsimGeoT");
+	geotree->SetBranchAddress("wcsimrootgeom", &geo);
+	geotree->GetEntry(0);
+
+	int numPMTs = geo->GetWCNumPMT();
+
+	//TH1F *angleHist = new TH1F("Angle", "PMT ID vs Angle", numPMTs, 1, numPMTs + 1);
+	TH1F *angleHist = new TH1F("Angle", "PMT ID vs Angle", endID - startID, startID, endID);
+	angleHist->GetXaxis()->SetTitle("PMT ID");
+	angleHist->GetYaxis()->SetTitle("Angle [degree]");
+
+	//TH1F *hitHist = new TH1F("PMT Hits", "PMT Hits", numPMTs, 1, numPMTs + 1);
+	TH1F *hitHist = new TH1F("PMT Hits", "PMT Hits", endID - startID, startID, endID);
+	hitHist->GetXaxis()->SetTitle("PMT ID");
+
+	TH1F *chargeHist = new TH1F("Charge", "PMT Charge", endID - startID, startID, endID);
+	chargeHist->GetXaxis()->SetTitle("PMT ID");
+	chargeHist->GetYaxis()->SetTitle("Charge");
+	
+	TTree *tree = (TTree*)file->Get("wcsimT");
+	WCSimRootEvent *wcsimrootsuperevent = new WCSimRootEvent();
+	tree->SetBranchAddress("wcsimrootevent", &wcsimrootsuperevent);
+
+	int numEvents = tree->GetEntries();
+
+	for (int i = 0; i < numEvents; ++i)
+	{
+		tree->GetEntry(i);
+
+		WCSimRootTrigger *wcsimrootevent = wcsimrootsuperevent->GetTrigger(0);
+
+		TClonesArray *hitArray = wcsimrootevent->GetCherenkovDigiHits();
+		
+		for (int j = 0; j < hitArray->GetEntries(); ++j)
+		{
+			WCSimRootCherenkovDigiHit *hit = (WCSimRootCherenkovDigiHit*)hitArray->At(j);
+            int tubeID = hit->GetTubeId();
+
+			hitHist->Fill(tubeID);
+			double charge = hit->GetQ();
+			chargeHist->Fill(tubeID, charge);
+		}
+	}
+
+	for (int tubeID = 1; tubeID <= numPMTs; ++tubeID)
+	{
+        WCSimRootPMT pmtInfo = geo->GetPMT(tubeID - 1);
+
+        TLorentzVector pmtPosition(pmtInfo.GetPosition(0), pmtInfo.GetPosition(1), pmtInfo.GetPosition(2), 0);
+        TLorentzVector pmtOrientation(pmtInfo.GetOrientation(0), pmtInfo.GetOrientation(1), pmtInfo.GetOrientation(2), 0);
+
+        TLorentzVector positionVector = pmtPosition - photonPosition;
+
+        double cosTheta = positionVector.Dot(pmtOrientation) / (positionVector.Vect().Mag() * pmtOrientation.Vect().Mag());
+
+        double angleRad = TMath::ACos(cosTheta);
+        double angleDeg = angleRad * TMath::RadToDeg();
+
+        angleHist->Fill(tubeID, angleDeg);
+	}
+
+TCanvas *c2 = new TCanvas("c2", "PMT ID vs Angle and Hits", 800, 950);
+
+TPad *pad1 = new TPad("pad1","pad1",0,0,1,0.33);
+TPad *pad2 = new TPad("pad2","pad2",0,0.33,1,0.66);
+TPad *pad3 = new TPad("pad3","pad3",0,0.66,1,1);
+
+// Draw the pads on the canvas
+pad1->Draw();
+pad2->Draw();
+ pad3->Draw();
+
+pad2->cd();
+hitHist->Draw();
+hitHist->GetYaxis()->SetRangeUser(0, hitHist->GetMaximum());
+hitHist->SetLineColor(kBlue);
+
+pad3->cd();
+angleHist->Draw();
+angleHist->GetYaxis()->SetRangeUser(0, angleHist->GetMaximum());
+angleHist->SetLineColor(kRed);
+
+pad1->cd();
+chargeHist->Draw();
+chargeHist->GetYaxis()->SetRangeUser(0, chargeHist->GetMaximum());
+chargeHist->SetLineColor(kGreen);
+
+// Update the canvas
+c2->Update();
+
+
+}

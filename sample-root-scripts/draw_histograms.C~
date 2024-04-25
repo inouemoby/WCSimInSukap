@@ -1,0 +1,23 @@
+void draw_histograms() {
+    char *wcsimdirenv;
+    wcsimdirenv = getenv("WCSIMDIR");
+    if (wcsimdirenv != NULL)
+    {
+        gSystem->Load("${WCSIMDIR}/libWCSimRoot.so");
+    }
+    else
+    {
+        gSystem->Load("../libWCSimRoot.so");
+    }
+    TFile *f = new TFile("../rootfile/wcsim_output.root");
+    TTree *tree = (TTree*)f->Get("wcsimT");
+    TH1F *hx = new TH1F("hx", "Total PMT hits on x-axis", 100, -1000, 1000);
+    TH1F *hy = new TH1F("hy", "Total PMT hits on y-axis", 100, -1000, 1000);
+    TH1F *hz = new TH1F("hz", "Total PMT hits on z-axis", 100, -1000, 1000);
+    tree->Draw("x>>hx", "triggerHit");
+    tree->Draw("y>>hy", "triggerHit");
+    tree->Draw("z>>hz", "triggerHit");
+    hx->Draw();
+    hy->Draw();
+    hz->Draw();
+}

@@ -1,0 +1,16 @@
+// SetEnvironment.h
+#ifndef SETENVIRONMENT_H
+#define SETENVIRONMENT_H
+
+// 加载WCSim库
+char* wcsimdirenv;
+wcsimdirenv = getenv ("WCSIMDIR");
+
+if(wcsimdirenv !=  NULL){
+    gSystem->Load("${WCSIMDIR}/libWCSimRoot.so");
+}else{
+    gSystem->Load("../libWCSimRoot.so");
+}
+
+
+#endif // SETENVIRONMENT_H

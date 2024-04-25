@@ -1,0 +1,84 @@
+#include "TSystem.h"
+#include "TLorentzVector.h"
+
+#include "Display3DView.C"
+
+const char* filename = "../rootfile/wcsim_output.root";
+
+HitListManager cal_pmtinjectangle(TLorentzVector& photonPosition = TLorentzVector(0, 0, 0, 0))
+{
+  TFile *file = TFile::Open(filename);
+  if (!file || file->IsZombie())
+    {
+      cout << "Can not open the rootfile!" << endl;
+      return;
+    }
+
+  
+  TTree *geotree = (TTree*)file->Get("wcsimGeoT");
+
+
+  WCSimRootGeom *geo = 0;
+  geotree->SetBranchAddress("wcsimrootgeom", &geo);
+  geotree->GetEntry(0);
+  
+  HitListManager manager;
+
+  int numPMTs = geo->GetWCNumPMT();
+  
+
+  for (int tubeID = 1; tubeID <= numPMTs; ++tubeID)
+    {
+      WCSimRootPMT pmtInfo = geo->GetPMT(tubeID - 1);
+
+      TLorentzVector pmtPosition(pmtInfo.GetPosition(0), pmtInfo.GetPosition(1), pmtInfo.GetPosition(2), 0);
+      TLorentzVector pmtOrientation(pmtInfo.GetOrientation(0), pmtInfo.GetOrientation(1), pmtInfo.GetOrientation(2), 0);
+
+      TLorentzVector positionVector = pmtPosition - photonPosition;
+
+      double cosTheta = positionVector.Dot(pmtOrientation) / (positionVector.Vect().Mag() * pmtOrientation.Vect().Mag());
+
+      double angle = TMath::ACos(cosTheta) * TMath::RadToDeg();
+        
+      manager.AddValue(angle);
+    }
+  file->Close();
+  return manager;
+}
+
+double cal_pmtidinjectangle(int pmtID, TLorentzVector& photonPosition = TLorentzVector(0, 0, 0, 0))
+{
+  TFile *file = TFile::Open(filename);
+  if (!file || file->IsZombie())
+    {
+      cont << "Can not open the rootfile!" << endl;
+      return;
+    }
+
+  TTree *geotree = (TTree*)file->Get("wcsimGeoT");
+  file->Close();
+
+  WCSimRootGeom *geo = 0;
+  geotree->SetBranchAddress("wcsimrootgeom", &geo);
+  geotree->GetEntry(0);
+
+  
+  if (pmtID < 1 || pmtID > geo->GetWCNumPMT())
+    {
+        return 180.0;
+    }
+
+    WCSimRootPMT pmtInfo = geo->GetPMT(pmtID - 1);
+
+    TLorentzVector pmtPosition(pmtInfo.GetPosition(0), pmtInfo.GetPosition(1), pmtInfo.GetPosition(2), 0);
+    TLorentzVector pmtOrientation(pmtInfo.GetOrientation(0), pmtInfo.GetOrientation(1), pmtInfo.GetOrientation(2), 0);
+
+    TLorentzVector positionVector = pmtPosition - photonPosition;
+
+    double cosTheta = positionVector.Dot(pmtOrientation) / (positionVector.Vect().Mag() * pmtOrientation.Vect().Mag());
+
+    double angle = TMath::ACos(cosTheta) * TMath::RadToDeg();
+
+    file->Close();
+    return angle;
+}
